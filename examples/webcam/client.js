@@ -61,7 +61,7 @@ function start() {
         }
     });
 
-    document.getElementById('start').style.display = 'none';
+    //document.getElementById('start').style.display = 'none';
     negotiate();
     document.getElementById('stop').style.display = 'inline-block';
 }
