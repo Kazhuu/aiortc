@@ -14,6 +14,8 @@ from aiortc.contrib.media import MediaPlayer
 ROOT = os.path.dirname(__file__)
 
 
+pcs = None
+
 async def index(request):
     content = open(os.path.join(ROOT, "index.html"), "r").read()
     return web.Response(content_type="text/html", text=content)
@@ -25,47 +27,47 @@ async def javascript(request):
 
 
 async def offer(request):
+    global pcs
     params = await request.json()
     offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
 
-    pc = RTCPeerConnection()
-    pcs.add(pc)
+    # if pcs != None:
+        # await pcs.close()
+    pcs = RTCPeerConnection()
 
-    @pc.on("iceconnectionstatechange")
+    @pcs.on("iceconnectionstatechange")
     async def on_iceconnectionstatechange():
-        print("ICE connection state is %s" % pc.iceConnectionState)
-        if pc.iceConnectionState == "failed":
-            await pc.close()
-            pcs.discard(pc)
+        global pcs
+        print("ICE connection state is %s" % pcs.iceConnectionState)
+        if pcs.iceConnectionState == "failed":
+            await pcs.close()
+            pcs = None
 
     # open media source
     options = {"framerate": "30", "video_size": "128x128"}
     player = MediaPlayer("/dev/video0", format="v4l2", options=options)
 
-    await pc.setRemoteDescription(offer)
-    for t in pc.getTransceivers():
+    await pcs.setRemoteDescription(offer)
+    for t in pcs.getTransceivers():
         if t.kind == "video" and player.video:
-            pc.addTrack(player.video)
+            pcs.addTrack(player.video)
 
-    answer = await pc.createAnswer()
-    await pc.setLocalDescription(answer)
+    answer = await pcs.createAnswer()
+    await pcs.setLocalDescription(answer)
 
     return web.Response(
         content_type="application/json",
         text=json.dumps(
-            {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
+            {"sdp": pcs.localDescription.sdp, "type": pcs.localDescription.type}
         ),
     )
 
 
-pcs = set()
-
-
 async def on_shutdown(app):
     # close peer connections
-    coros = [pc.close() for pc in pcs]
-    await asyncio.gather(*coros)
-    pcs.clear()
+    if pcs != None:
+        coros = await pcs.close()
+        await asyncio.gather(*coros)
 
 
 if __name__ == "__main__":
