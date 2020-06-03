@@ -61,7 +61,7 @@ async def offer(request):
     return web.Response(
         content_type="application/json",
         text=json.dumps(
-            {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
+            {"sdp": answer.sdp, "type": answer.type}
         ),
     )
 
